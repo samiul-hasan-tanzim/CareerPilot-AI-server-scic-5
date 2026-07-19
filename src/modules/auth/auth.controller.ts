@@ -1,7 +1,9 @@
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 import { User } from "./auth.model";
+import { PasswordResetToken } from "./password-reset.model";
 import type { AuthRequest } from "../../middlewares/verifyToken";
 
 const secret = () => process.env.JWT_SECRET || "fallback_secret_change_me";
@@ -146,6 +148,103 @@ export const exchangeToken = async (req: Request, res: Response): Promise<void> 
   } catch (error) {
     console.error("Exchange token error:", error);
     res.status(500).json({ message: "Failed to exchange token" });
+  }
+};
+
+export const forgotPassword = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email } = req.body;
+
+    const user = await User.findOne({ email: email?.toLowerCase() });
+    if (!user) {
+      res.json({ message: "If that email exists, a reset link has been sent." });
+      return;
+    }
+
+    await PasswordResetToken.deleteMany({ email: email.toLowerCase(), used: false });
+
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+    await PasswordResetToken.create({ email: email.toLowerCase(), token, expiresAt });
+
+    const resetLink = `${process.env.CLIENT_URL || "http://localhost:3000"}/reset-password?token=${token}`;
+
+    res.json({
+      message: "If that email exists, a reset link has been sent.",
+      resetLink,
+    });
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    res.status(500).json({ message: "Failed to process request" });
+  }
+};
+
+export const resetPassword = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+      res.status(400).json({ message: "Token and new password are required" });
+      return;
+    }
+
+    if (password.length < 6) {
+      res.status(400).json({ message: "Password must be at least 6 characters" });
+      return;
+    }
+
+    const resetToken = await PasswordResetToken.findOne({ token, used: false });
+
+    if (!resetToken || resetToken.expiresAt < new Date()) {
+      res.status(400).json({ message: "Invalid or expired reset token" });
+      return;
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await User.updateOne({ email: resetToken.email }, { password: hashedPassword });
+    await PasswordResetToken.updateOne({ _id: resetToken._id }, { used: true });
+
+    res.json({ message: "Password reset successfully. You can now log in." });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    res.status(500).json({ message: "Failed to reset password" });
+  }
+};
+
+export const changePassword = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      res.status(400).json({ message: "Current password and new password are required" });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      res.status(400).json({ message: "New password must be at least 6 characters" });
+      return;
+    }
+
+    const user = await User.findById(req.userId);
+    if (!user) {
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      res.status(400).json({ message: "Current password is incorrect" });
+      return;
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    res.json({ message: "Password changed successfully" });
+  } catch (error) {
+    console.error("Change password error:", error);
+    res.status(500).json({ message: "Failed to change password" });
   }
 };
 

@@ -1,15 +1,13 @@
 import { Request, Response } from "express";
+import { ContactMessage } from "./contact.model";
+import { Subscriber } from "./subscriber.model";
 
 export const submitContact = async (req: Request, res: Response): Promise<void> => {
   try {
     const { name, email, subject, message } = req.body;
 
-    if (!name || !email || !message) {
-      res.status(400).json({ message: "Name, email, and message are required" });
-      return;
-    }
+    await ContactMessage.create({ name, email, subject, message });
 
-    // In production, send email or save to DB
     res.json({ message: "Message received. We'll get back to you soon." });
   } catch (error) {
     console.error("Contact error:", error);
@@ -21,12 +19,14 @@ export const subscribe = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email } = req.body;
 
-    if (!email) {
-      res.status(400).json({ message: "Email is required" });
+    const exists = await Subscriber.findOne({ email });
+    if (exists) {
+      res.json({ message: "Already subscribed" });
       return;
     }
 
-    // In production, save to mailing list
+    await Subscriber.create({ email });
+
     res.json({ message: "Subscribed successfully" });
   } catch (error) {
     console.error("Subscribe error:", error);

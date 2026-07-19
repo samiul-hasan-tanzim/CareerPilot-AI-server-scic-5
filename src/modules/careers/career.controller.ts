@@ -20,7 +20,15 @@ export const getCareers = async (req: Request, res: Response): Promise<void> => 
     const filter: Record<string, unknown> = {};
 
     if (search) {
-      filter.$text = { $search: search };
+      const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      filter.$or = [
+        { title: { $regex: escaped, $options: "i" } },
+        { skills: { $regex: escaped, $options: "i" } },
+        { industry: { $regex: escaped, $options: "i" } },
+        { description: { $regex: escaped, $options: "i" } },
+        { shortDescription: { $regex: escaped, $options: "i" } },
+        { company: { $regex: escaped, $options: "i" } },
+      ];
     }
 
     if (level) {
@@ -125,6 +133,16 @@ export const getCareerById = async (req: Request, res: Response): Promise<void> 
   }
 };
 
+export const getMyCareers = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const careers = await Career.find({ createdBy: req.userId }).sort({ createdAt: -1 }).lean();
+    res.json({ careers });
+  } catch (error) {
+    console.error("Get my careers error:", error);
+    res.status(500).json({ message: "Failed to fetch your careers" });
+  }
+};
+
 export const createCareer = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const career = await Career.create({ ...req.body, createdBy: req.userId });
@@ -137,11 +155,16 @@ export const createCareer = async (req: AuthRequest, res: Response): Promise<voi
 
 export const updateCareer = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const career = await Career.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!career) {
+    const existing = await Career.findById(req.params.id);
+    if (!existing) {
       res.status(404).json({ message: "Career not found" });
       return;
     }
+    if (existing.createdBy !== req.userId) {
+      res.status(403).json({ message: "You can only update your own careers" });
+      return;
+    }
+    const career = await Career.findByIdAndUpdate(req.params.id, req.body, { new: true });
     res.json({ career });
   } catch (error) {
     console.error("Update career error:", error);
@@ -149,13 +172,18 @@ export const updateCareer = async (req: AuthRequest, res: Response): Promise<voi
   }
 };
 
-export const deleteCareer = async (req: Request, res: Response): Promise<void> => {
+export const deleteCareer = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const career = await Career.findByIdAndDelete(req.params.id);
-    if (!career) {
+    const existing = await Career.findById(req.params.id);
+    if (!existing) {
       res.status(404).json({ message: "Career not found" });
       return;
     }
+    if (existing.createdBy !== req.userId) {
+      res.status(403).json({ message: "You can only delete your own careers" });
+      return;
+    }
+    await Career.findByIdAndDelete(req.params.id);
     res.json({ message: "Career deleted" });
   } catch (error) {
     console.error("Delete career error:", error);

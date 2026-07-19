@@ -1,5 +1,5 @@
 import { Resume } from "../modules/uploads/upload.model";
-import { generateWithGemini } from "./gemini";
+import { generateWithGemini, generateWithGeminiStream } from "./gemini";
 
 interface ChatContext {
   skills: string[];
@@ -176,4 +176,52 @@ ${resumeSummary}`;
   }
 
   return fallbackResponse(context);
+}
+
+export async function* generateChatResponseStream(
+  userId: string,
+  message: string
+): AsyncGenerator<string> {
+  const latestResume = await Resume.findOne({ userId }).sort({ createdAt: -1 });
+
+  const context: ChatContext = {
+    skills: latestResume?.extractedData?.skills || [],
+    technologies: latestResume?.extractedData?.technologies || [],
+    experience: latestResume?.extractedData?.experience || [],
+    education: latestResume?.extractedData?.education || [],
+    score: latestResume?.analysis?.score,
+  };
+
+  const resumeSummary = [
+    `Skills: ${context.skills.join(", ") || "None listed"}`,
+    `Technologies: ${context.technologies.join(", ") || "None listed"}`,
+    `Experience: ${context.experience.join("; ") || "None listed"}`,
+    `Education: ${context.education.join("; ") || "None listed"}`,
+    `Resume Score: ${context.score ?? "N/A"}/100`,
+  ].join("\n");
+
+  const systemPrompt = `You are CareerPilot AI, a helpful career mentor assistant. 
+You have access to the user's resume data below. Answer their career questions concisely and helpfully.
+Use markdown formatting (bold, lists, code) where appropriate.
+
+USER'S RESUME DATA:
+${resumeSummary}`;
+
+  let usedGemini = false;
+  const geminiStream = generateWithGeminiStream(systemPrompt, message);
+  for await (const chunk of geminiStream) {
+    if (chunk === null) break;
+    usedGemini = true;
+    yield chunk;
+  }
+  if (usedGemini) return;
+
+  for (const { pattern, response } of topicPatterns) {
+    if (pattern.test(message)) {
+      yield response(context);
+      return;
+    }
+  }
+
+  yield fallbackResponse(context);
 }

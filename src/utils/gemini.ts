@@ -34,3 +34,30 @@ export async function generateWithGemini(
     return null;
   }
 }
+
+export async function* generateWithGeminiStream(
+  systemPrompt: string,
+  userMessage: string
+): AsyncGenerator<string | null> {
+  const client = getClient();
+  if (!client) {
+    console.log("Gemini: no API key configured, skipping");
+    yield null;
+    return;
+  }
+
+  try {
+    const model = client.getGenerativeModel({
+      model: "gemini-1.5-flash",
+      systemInstruction: systemPrompt,
+    });
+    const result = await model.generateContentStream(userMessage);
+    for await (const chunk of result.stream) {
+      const text = chunk.text();
+      if (text) yield text;
+    }
+  } catch (error) {
+    console.error("Gemini streaming error:", error);
+    yield null;
+  }
+}
