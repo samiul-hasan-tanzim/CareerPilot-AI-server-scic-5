@@ -57,3 +57,14 @@ export const getUserResumes = async (req: Request, res: Response): Promise<void>
     res.status(500).json({ message: "Failed to fetch resumes" });
   }
 };
+
+export const deleteResume = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    await Resume.findByIdAndDelete(id);
+    res.json({ message: "Resume deleted" });
+  } catch (error) {
+    console.error("Delete resume error:", error);
+    res.status(500).json({ message: "Failed to delete resume" });
+  }
+};
