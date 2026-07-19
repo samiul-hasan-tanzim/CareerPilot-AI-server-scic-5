@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import mongoose from "mongoose";
 import { UserProfile } from "./profile.model";
 import { Resume } from "../uploads/upload.model";
 import { Conversation } from "../chat/chat.model";
@@ -44,6 +45,16 @@ export const deleteAccount = async (req: Request, res: Response): Promise<void> 
       Resume.deleteMany({ userId }),
       Conversation.deleteMany({ userId }),
     ]);
+
+    // Delete the Better Auth user record from the user collection
+    try {
+      const db = mongoose.connection.db;
+      if (db) {
+        await db.collection("user").deleteOne({ _id: new mongoose.Types.ObjectId(userId) });
+      }
+    } catch {
+      // If userId is not a valid ObjectId or collection doesn't exist, skip
+    }
 
     res.json({ message: "Account deleted" });
   } catch (error) {

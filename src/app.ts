@@ -6,6 +6,11 @@ import recommendationRoutes from "./modules/recommendations/recommendation.route
 import chatRoutes from "./modules/chat/chat.route";
 import workflowRoutes from "./modules/workflow/workflow.route";
 import profileRoutes from "./modules/profile/profile.route";
+import authRoutes from "./modules/auth/auth.route";
+import careerRoutes from "./modules/careers/career.route";
+import dashboardRoutes from "./modules/dashboard/dashboard.route";
+import contactRoutes from "./modules/contact/contact.route";
+import subscribeRoutes from "./modules/contact/subscribe.route";
 
 const app = express();
 
@@ -15,6 +20,11 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
+app.use("/api/auth", authRoutes);
+app.use("/api/careers", careerRoutes);
+app.use("/api/contact", contactRoutes);
+app.use("/api/subscribe", subscribeRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/resumes", uploadRoutes);
 app.use("/api/recommendations", recommendationRoutes);
 app.use("/api/chat", chatRoutes);
