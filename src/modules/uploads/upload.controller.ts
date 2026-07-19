@@ -1,10 +1,11 @@
 import { Request, Response } from "express";
 import path from "path";
+import type { AuthRequest } from "../../middlewares/verifyToken";
 import { Resume } from "./upload.model";
 import { parseResume } from "../../utils/resume-parser";
 import { analyzeResume } from "../../utils/resume-analyzer";
 
-export const uploadResume = async (req: Request, res: Response): Promise<void> => {
+export const uploadResume = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     if (!req.file) {
       res.status(400).json({ message: "No file uploaded" });
@@ -16,7 +17,7 @@ export const uploadResume = async (req: Request, res: Response): Promise<void> =
     const parsed = await parseResume(file.buffer, file.originalname);
 
     const resume = await Resume.create({
-      userId: req.body.userId || "anonymous",
+      userId: req.userId || "anonymous",
       fileName: file.originalname,
       fileSize: file.size,
       fileType: path.extname(file.originalname).toLowerCase(),
@@ -48,9 +49,10 @@ export const uploadResume = async (req: Request, res: Response): Promise<void> =
   }
 };
 
-export const getUserResumes = async (req: Request, res: Response): Promise<void> => {
+export const getUserResumes = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const resumes = await Resume.find({ userId: req.params.userId }).sort({ createdAt: -1 });
+    const userId = req.userId || req.params.userId;
+    const resumes = await Resume.find({ userId }).sort({ createdAt: -1 });
     res.json({ resumes });
   } catch (error) {
     console.error("Fetch resumes error:", error);
@@ -58,7 +60,7 @@ export const getUserResumes = async (req: Request, res: Response): Promise<void>
   }
 };
 
-export const deleteResume = async (req: Request, res: Response): Promise<void> => {
+export const deleteResume = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     await Resume.findByIdAndDelete(id);

@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import type { AuthRequest } from "../../middlewares/verifyToken";
 import { Career } from "./career.model";
 
 export const getCareers = async (req: Request, res: Response): Promise<void> => {
@@ -34,6 +35,9 @@ export const getCareers = async (req: Request, res: Response): Promise<void> => 
       filter.remote = true;
     }
 
+    const minVal = minSalary ? parseInt(minSalary, 10) : NaN;
+    const maxVal = maxSalary ? parseInt(maxSalary, 10) : NaN;
+
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 12));
     const skip = (pageNum - 1) * limitNum;
@@ -43,10 +47,52 @@ export const getCareers = async (req: Request, res: Response): Promise<void> => 
       : "createdAt";
     const sortOrder = order === "asc" ? 1 : -1;
 
-    const [careers, total] = await Promise.all([
-      Career.find(filter).sort({ [sortField]: sortOrder }).skip(skip).limit(limitNum).lean(),
-      Career.countDocuments(filter),
-    ]);
+    let careers;
+    let total: number;
+
+    if (!isNaN(minVal) || !isNaN(maxVal)) {
+      const salaryFilter: Record<string, number> = {};
+      if (!isNaN(minVal)) salaryFilter.$gte = minVal;
+      if (!isNaN(maxVal)) salaryFilter.$lte = maxVal;
+
+      const sortDir = sortOrder as 1 | -1;
+      const sortKey = sortField === "salary" ? "salaryNum" : sortField;
+
+      const results = await Career.aggregate([
+        { $match: filter },
+        {
+          $addFields: {
+            salaryNum: {
+              $toInt: { $arrayElemAt: [{ $split: [{ $arrayElemAt: [{ $split: ["$salary", "$"] }, 1] }, "K"] }, 0] },
+            },
+          },
+        },
+        { $match: { salaryNum: salaryFilter } },
+        { $sort: { [sortKey]: sortDir } },
+        { $skip: skip },
+        { $limit: limitNum },
+      ]);
+      careers = results;
+
+      const countResult = await Career.aggregate([
+        { $match: filter },
+        {
+          $addFields: {
+            salaryNum: {
+              $toInt: { $arrayElemAt: [{ $split: [{ $arrayElemAt: [{ $split: ["$salary", "$"] }, 1] }, "K"] }, 0] },
+            },
+          },
+        },
+        { $match: { salaryNum: salaryFilter } },
+        { $count: "total" },
+      ]);
+      total = countResult.length > 0 ? (countResult[0] as { total: number }).total : 0;
+    } else {
+      [careers, total] = await Promise.all([
+        Career.find(filter).sort({ [sortField]: sortOrder }).skip(skip).limit(limitNum).lean(),
+        Career.countDocuments(filter),
+      ]);
+    }
 
     res.json({
       careers,
@@ -79,9 +125,9 @@ export const getCareerById = async (req: Request, res: Response): Promise<void> 
   }
 };
 
-export const createCareer = async (req: Request, res: Response): Promise<void> => {
+export const createCareer = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const career = await Career.create(req.body);
+    const career = await Career.create({ ...req.body, createdBy: req.userId });
     res.status(201).json({ career });
   } catch (error) {
     console.error("Create career error:", error);
@@ -89,7 +135,7 @@ export const createCareer = async (req: Request, res: Response): Promise<void> =
   }
 };
 
-export const updateCareer = async (req: Request, res: Response): Promise<void> => {
+export const updateCareer = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const career = await Career.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!career) {

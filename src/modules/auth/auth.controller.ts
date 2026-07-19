@@ -131,6 +131,24 @@ export const googleLogin = async (req: Request, res: Response): Promise<void> =>
   }
 };
 
+export const exchangeToken = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      res.status(400).json({ message: "userId is required" });
+      return;
+    }
+
+    const token = generateToken(userId);
+
+    res.json({ token, userId });
+  } catch (error) {
+    console.error("Exchange token error:", error);
+    res.status(500).json({ message: "Failed to exchange token" });
+  }
+};
+
 export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const user = await User.findById(req.userId).select("-password");
