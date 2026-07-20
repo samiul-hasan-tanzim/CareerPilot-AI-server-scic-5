@@ -31,8 +31,19 @@ app.use("/api/chat", chatRoutes);
 app.use("/api/workflow", workflowRoutes);
 app.use("/api/profile", profileRoutes);
 
-app.get("/api/health", (_req, res) => {
-  res.json({ status: "ok" });
+app.get("/api/health", async (_req, res) => {
+  try {
+    const mongoose = await import("mongoose");
+    const mongoState = mongoose.default.connection.readyState;
+    const states = ["disconnected", "connected", "connecting", "disconnecting"];
+    res.json({
+      status: "ok",
+      mongodb: states[mongoState] || "unknown",
+      node: process.version,
+    });
+  } catch {
+    res.json({ status: "ok", mongodb: "unknown" });
+  }
 });
 
 export default app;

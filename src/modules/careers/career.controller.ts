@@ -66,15 +66,27 @@ export const getCareers = async (req: Request, res: Response): Promise<void> => 
       const sortDir = sortOrder as 1 | -1;
       const sortKey = sortField === "salary" ? "salaryNum" : sortField;
 
-      const results = await Career.aggregate([
-        { $match: filter },
-        {
-          $addFields: {
-            salaryNum: {
-              $toInt: { $arrayElemAt: [{ $split: [{ $arrayElemAt: [{ $split: ["$salary", "$"] }, 1] }, "K"] }, 0] },
+      const addSalaryNum = {
+        $addFields: {
+          salaryNum: {
+            $convert: {
+              input: {
+                $arrayElemAt: [
+                  { $split: [{ $arrayElemAt: [{ $split: ["$salary", "$"] }, 1] }, "K"] },
+                  0,
+                ],
+              },
+              to: "int",
+              onError: -1,
+              onNull: -1,
             },
           },
         },
+      };
+
+      const results = await Career.aggregate([
+        { $match: filter },
+        addSalaryNum,
         { $match: { salaryNum: salaryFilter } },
         { $sort: { [sortKey]: sortDir } },
         { $skip: skip },
@@ -84,13 +96,7 @@ export const getCareers = async (req: Request, res: Response): Promise<void> => 
 
       const countResult = await Career.aggregate([
         { $match: filter },
-        {
-          $addFields: {
-            salaryNum: {
-              $toInt: { $arrayElemAt: [{ $split: [{ $arrayElemAt: [{ $split: ["$salary", "$"] }, 1] }, "K"] }, 0] },
-            },
-          },
-        },
+        addSalaryNum,
         { $match: { salaryNum: salaryFilter } },
         { $count: "total" },
       ]);
@@ -112,8 +118,9 @@ export const getCareers = async (req: Request, res: Response): Promise<void> => 
       },
     });
   } catch (error) {
-    console.error("Get careers error:", error);
-    res.status(500).json({ message: "Failed to fetch careers" });
+    const msg = error instanceof Error ? error.message : "Unknown error";
+    console.error("Get careers error:", msg);
+    res.status(500).json({ message: "Failed to fetch careers", error: msg });
   }
 };
 
@@ -128,8 +135,9 @@ export const getCareerById = async (req: Request, res: Response): Promise<void> 
 
     res.json({ career });
   } catch (error) {
-    console.error("Get career error:", error);
-    res.status(500).json({ message: "Failed to fetch career" });
+    const msg = error instanceof Error ? error.message : "Unknown error";
+    console.error("Get career error:", msg);
+    res.status(500).json({ message: "Failed to fetch career", error: msg });
   }
 };
 
@@ -203,7 +211,8 @@ export const getFilterOptions = async (_req: Request, res: Response): Promise<vo
       industries: industries.filter(Boolean).sort(),
     });
   } catch (error) {
-    console.error("Get filter options error:", error);
-    res.status(500).json({ message: "Failed to fetch filter options" });
+    const msg = error instanceof Error ? error.message : "Unknown error";
+    console.error("Get filter options error:", msg);
+    res.status(500).json({ message: "Failed to fetch filter options", error: msg });
   }
 };
