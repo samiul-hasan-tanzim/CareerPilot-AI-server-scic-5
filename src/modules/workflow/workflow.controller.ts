@@ -105,7 +105,8 @@ export const runWorkflow = async (req: Request, res: Response): Promise<void> =>
 
     res.json({ logs, success: true });
   } catch (error) {
-    console.error("Run workflow error:", error);
-    res.status(500).json({ message: "Failed to run workflow" });
+    const msg = error instanceof Error ? error.message : "Unknown error";
+    console.error("Run workflow error:", msg);
+    res.status(500).json({ message: "Failed to run workflow", error: msg });
   }
 };

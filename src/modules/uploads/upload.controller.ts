@@ -44,8 +44,9 @@ export const uploadResume = async (req: AuthRequest, res: Response): Promise<voi
       },
     });
   } catch (error) {
-    console.error("Upload error:", error);
-    res.status(500).json({ message: "Failed to upload resume" });
+    const msg = error instanceof Error ? error.message : "Unknown error";
+    console.error("Upload error:", msg);
+    res.status(500).json({ message: "Failed to upload resume", error: msg });
   }
 };
 
@@ -55,8 +56,9 @@ export const getUserResumes = async (req: AuthRequest, res: Response): Promise<v
     const resumes = await Resume.find({ userId }).sort({ createdAt: -1 });
     res.json({ resumes });
   } catch (error) {
-    console.error("Fetch resumes error:", error);
-    res.status(500).json({ message: "Failed to fetch resumes" });
+    const msg = error instanceof Error ? error.message : "Unknown error";
+    console.error("Fetch resumes error:", msg);
+    res.status(500).json({ message: "Failed to fetch resumes", error: msg });
   }
 };
 
@@ -66,7 +68,8 @@ export const deleteResume = async (req: AuthRequest, res: Response): Promise<voi
     await Resume.findByIdAndDelete(id);
     res.json({ message: "Resume deleted" });
   } catch (error) {
-    console.error("Delete resume error:", error);
-    res.status(500).json({ message: "Failed to delete resume" });
+    const msg = error instanceof Error ? error.message : "Unknown error";
+    console.error("Delete resume error:", msg);
+    res.status(500).json({ message: "Failed to delete resume", error: msg });
   }
 };

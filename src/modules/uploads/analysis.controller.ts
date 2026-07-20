@@ -27,7 +27,8 @@ export const analyzeResumeHandler = async (req: Request, res: Response): Promise
       analysis,
     });
   } catch (error) {
-    console.error("Analysis error:", error);
-    res.status(500).json({ message: "Failed to analyze resume" });
+    const msg = error instanceof Error ? error.message : "Unknown error";
+    console.error("Analysis error:", msg);
+    res.status(500).json({ message: "Failed to analyze resume", error: msg });
   }
 };
