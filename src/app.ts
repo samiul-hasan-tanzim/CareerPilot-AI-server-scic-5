@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import connectDB from "./config/db";
 import uploadRoutes from "./modules/uploads/upload.route";
 import recommendationRoutes from "./modules/recommendations/recommendation.route";
 import chatRoutes from "./modules/chat/chat.route";
@@ -12,6 +13,18 @@ import contactRoutes from "./modules/contact/contact.route";
 import subscribeRoutes from "./modules/contact/subscribe.route";
 
 const app = express();
+
+app.use(async (_req, res, next) => {
+  try {
+    const cached = (global as Record<string, unknown>).__mongoose as { conn: unknown; promise: Promise<unknown> | null } | undefined;
+    await connectDB().catch(() => {
+      if (cached) cached.promise = null;
+    });
+    next();
+  } catch {
+    next();
+  }
+});
 
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");

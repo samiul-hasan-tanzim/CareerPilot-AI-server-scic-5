@@ -1,24 +1,37 @@
 import mongoose from "mongoose";
 
-let connected = false;
+type MongooseCache = {
+  conn: typeof mongoose | null;
+  promise: Promise<typeof mongoose> | null;
+};
 
-const connectDB = async (): Promise<void> => {
-  if (connected && mongoose.connection.readyState === 1) return;
-  try {
-    const uri = process.env.MONGODB_URI;
-    const dbName = process.env.DB_NAME;
+const MONGODB_URI = process.env.MONGODB_URI;
+const DB_NAME = process.env.DB_NAME;
 
-    if (!uri || !dbName) {
-      console.error("Missing MONGODB_URI or DB_NAME in environment variables");
-      return;
-    }
+if (!MONGODB_URI || !DB_NAME) {
+  console.error("Missing MONGODB_URI or DB_NAME");
+}
 
-    await mongoose.connect(uri, { dbName });
-    connected = true;
-    console.log("MongoDB connected successfully");
-  } catch (error) {
-    console.error("MongoDB connection error:", error);
+declare global {
+  var __mongoose: MongooseCache | undefined;
+}
+
+let cached = global.__mongoose;
+if (!cached) {
+  cached = global.__mongoose = { conn: null, promise: null };
+}
+
+const connectDB = async (): Promise<typeof mongoose> => {
+  if (cached!.conn) return cached!.conn;
+  if (!cached!.promise) {
+    cached!.promise = mongoose.connect(MONGODB_URI!, {
+      dbName: DB_NAME,
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 10000,
+    });
   }
+  cached!.conn = await cached!.promise;
+  return cached!.conn;
 };
 
 export default connectDB;
