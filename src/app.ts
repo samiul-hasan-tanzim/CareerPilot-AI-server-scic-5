@@ -1,5 +1,4 @@
 import express from "express";
-import cors from "cors";
 import path from "path";
 import uploadRoutes from "./modules/uploads/upload.route";
 import recommendationRoutes from "./modules/recommendations/recommendation.route";
@@ -14,7 +13,16 @@ import subscribeRoutes from "./modules/contact/subscribe.route";
 
 const app = express();
 
-app.use(cors());
+app.use((_req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  if (_req.method === "OPTIONS") {
+    res.sendStatus(204);
+    return;
+  }
+  next();
+});
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
